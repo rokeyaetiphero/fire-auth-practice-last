@@ -7,18 +7,22 @@ import './App.css';
 firebase.initializeApp(firebaseConfig);//firebase.config.js thke call kora hyece
 
 const App = () => {
-
+  const [newUser,setNewUser] = useState(false)
   const [user,setUser] = useState({
     isSignedIn: false,
+    newUser: false,//by default dhre nilam tumi new user na
     name: '',
     photo: '',
     email: '',
-    password: ''
+    password: '',
+    error: ''
   })
 
-  const provider = new firebase.auth.GoogleAuthProvider();
+  const Googleprovider = new firebase.auth.GoogleAuthProvider();
+  const FBprovider = new firebase.auth.FacebookAuthProvider();
+
   const handleSignIn = () =>{
-    firebase.auth().signInWithPopup(provider)
+    firebase.auth().signInWithPopup(Googleprovider)
      
     .then(result => {
       const {displayName, photoURL,email} = result.user;
@@ -29,7 +33,6 @@ const App = () => {
         email: email
       }
       setUser(signedInUser);
-      console.log(displayName, photoURL, email);
       const token = result.credential.accessToken;
     })
 
@@ -41,6 +44,25 @@ const App = () => {
     })
   }
 
+  const handleFbSignIn  = () => {
+
+    firebase.auth().signInWithPopup(FBprovider).then((result) => {
+      var token = result.credential.accessToken;
+      var user = result.user;
+      console.log(user);
+    })
+    
+    .catch(function(error) {
+     
+      var errorCode = error.code;
+      var errorMessage = error.message;
+      
+      var email = error.email;
+     
+      var credential = error.credential;
+    });
+  }
+
   const handleSignOut = () => {
     firebase.auth().signOut()
     .then(res =>{
@@ -48,7 +70,8 @@ const App = () => {
          isSignedIn: false,
          name: '',
          photo: '',
-         email: ''
+         email: '',
+         success: false
        }
       setUser(signedOutUser)
     })
@@ -58,6 +81,7 @@ const App = () => {
     })
   }
 
+  //just email and pass r field ta valid kina check korar jnno
   const handleBlur = (e) => {
     //event ta jkhn thke trigger hyece seta hcce event.r j element thke trigger hcce seta hcce se element hcce target
     let isFieldValid = true;
@@ -79,22 +103,58 @@ const App = () => {
   }
 
   const handleSubmit = (e) => {
-    if(user.email && user.password){
+    if(newUser && user.email && user.password){
       firebase.auth().createUserWithEmailAndPassword(user.email, user.password)
-      .then((result) => {
-        // Signed in 
-        // ...
+      .then(res => {
+        const newUserInfo = {...user};
+        newUserInfo.error = '';
+        newUserInfo.success = true;
+        setUser(newUserInfo)
+        updateUserName(user.name)
       })
+
       .catch((error) => {
-        var errorCode = error.code;
-        var errorMessage = error.message;
-        console.log(errorCode, errorMessage);
-        // ..
+        const newUserInfo = {...user};
+        newUserInfo.error = error.message;
+        newUserInfo.success = false;
+        setUser(newUserInfo)
       });
 
     }
+
+    if(!newUser && user.email && user.password){
+      firebase.auth().signInWithEmailAndPassword(user.email, user.password)
+      .then((res) => {
+        const newUserInfo = {...user};
+        newUserInfo.error = '';
+        newUserInfo.success = true;
+        setUser(newUserInfo)
+        console.log('sign-in user info',res.user)
+      })
+      .catch((error) => {
+        const newUserInfo = {...user};
+        newUserInfo.error = error.message;
+        newUserInfo.success = false;
+        setUser(newUserInfo)
+      });
+    }
+
     e.preventDefault();
   }
+
+  const updateUserName = (name) => {
+    const user = firebase.auth().currentUser;
+
+       user.updateProfile({
+       displayName: name,
+     })
+       .then(function() {
+         console.log('User Name Updated successfully.');
+      })
+    .catch(function(error) {
+        console.log(error);
+     });
+   }
 
   return (
     
@@ -103,6 +163,9 @@ const App = () => {
         user.isSignedIn ? <button onClick={handleSignOut}>Sign Out</button>
         : <button onClick={handleSignIn}>Sign In</button>
       } 
+       <br/>
+        
+      <button onClick={handleFbSignIn}>Login Using Facebook</button>
 
       {
         user.isSignedIn && <div> 
@@ -114,17 +177,25 @@ const App = () => {
 
      <form action={handleSubmit}>
      <h1>Our Own Authentication</h1>
+     <input type="checkbox" onChange={()=>setNewUser(!newUser)} name="NewUser" id=""/>
+     <label htmlFor="NewUser">New User Sign Up</label>
      <h2>Name:{user.name}</h2>
      <h2>Email:{user.email}</h2>
      <h3>Password:{user.password}</h3>
-     <input type="text" name='name' onBlur={handleBlur}  placeholder="Your Name"/>
+     {
+       newUser && <input type="text" name='name' onBlur={handleBlur}  placeholder="Your Name"/>
+     }
      <br/>
      <input type="text" name='email' onBlur={handleBlur} placeholder="Your Email Address" required/>
      <br/>
      <input type="password" name='password' onBlur={handleBlur} id="" placeholder="Password" required/>
      <br/>
-     <input type="submit" value="Submit"/>
+     <input onClick={handleSubmit} type="submit" value={newUser ? 'Sign Up' : 'Sign In'}/>
      </form>
+     <p style={{color:'red'}}>{user.error}</p>
+     {
+      user.success && <p style={{color: 'green'}}>User {newUser ? 'Created' : 'Logged In'} Successfully</p>
+     }
     </div>
   );
 };
